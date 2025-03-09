@@ -15,7 +15,7 @@ class NotifySuite extends munit.CatsEffectSuite {
   import FC.{commit, delay}
   import PostgresTestTransactor.xa
 
- // Listen on the given channel, notify on another connection
+  // Listen on the given channel, notify on another connection
   def listen[A](channel: String, notify: ConnectionIO[A]): IO[List[PGNotification]] =
     (PHC.pgListen(channel) *> commit *>
       delay(IO.sleep(50.millis).unsafeRunSync()) *>
