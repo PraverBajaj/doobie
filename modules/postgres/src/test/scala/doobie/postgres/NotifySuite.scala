@@ -4,12 +4,11 @@
 
 package doobie.postgres
 
-import cats.effect.{IO, Sync}
+import cats.effect.{IO}
 import cats.syntax.all.*
 import doobie.*
 import doobie.implicits.*
 import org.postgresql.PGNotification
-import scala.concurrent.duration._
 
 class NotifySuite extends munit.CatsEffectSuite {
   import FC.{commit, delay}
@@ -17,22 +16,15 @@ class NotifySuite extends munit.CatsEffectSuite {
 
   // Listen on the given channel, notify on another connection
   def listen[A](channel: String, notify: ConnectionIO[A]): IO[List[PGNotification]] =
-    (PHC.pgListen(channel) *> commit *>
-      delay(IO.sleep(50.millis).unsafeRunSync()) *>
-      Sync[ConnectionIO].delay(notify.transact(xa).unsafeRunSync()) *>
-      delay(IO.sleep(50.millis).unsafeRunSync()) *>
-      PHC.pgGetNotifications).transact(xa)
-
-  // This does not works 
-  // def listen[A](channel: String, notify: ConnectionIO[A]): IO[List[PGNotification]] =
-  //   (for {
-  //     _ <- PHC.pgListen(channel)
-  //     _ <- FC.commit
-  //     _ <- FC.delay(IO.sleep(50.millis).void)
-  //     _ <- notify
-  //     _ <- FC.delay(IO.sleep(50.millis).void)
-  //     notifications <- PHC.pgGetNotifications
-  //   } yield notifications).transact(xa)
+  (for {
+    _ <- PHC.pgListen(channel)
+    _ <- commit
+    _ <- delay { Thread.sleep(50) }
+    _ <- notify
+    _ <- commit
+    _ <- delay { Thread.sleep(50) }
+    notifications <- PHC.pgGetNotifications
+  } yield notifications).transact(xa)
 
   test("LISTEN/NOTIFY should allow cross-connection notification") {
     val channel = "cha" + System.nanoTime.toString
